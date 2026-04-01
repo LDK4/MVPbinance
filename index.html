@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MVP Balance - Google Cloud</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
+        .card-saldo { background: #1e1e1e; padding: 30px; border-radius: 20px; width: 320px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; }
+        #valor-saldo { font-size: 3rem; margin: 10px 0; font-weight: bold; }
+        
+        .card-input { background: #1e1e1e; padding: 20px; border-radius: 20px; width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; }
+        input { background: #2a2a2a; border: 1px solid #333; color: white; padding: 15px; margin: 8px 0; width: 88%; border-radius: 12px; font-size: 1.1rem; outline: none; }
+        
+        .botoes { display: flex; gap: 10px; margin-top: 15px; }
+        button { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; font-size: 1rem; cursor: pointer; transition: 0.2s; }
+        .btn-recebi { background: #2ecc71; color: white; }
+        .btn-gastei { background: #e74c3c; color: white; }
+        .btn-google { background: #4285F4; color: white; width: 320px; margin-bottom: 20px; border-radius: 12px; border: none; padding: 15px; font-weight: bold; cursor: pointer; }
+
+        .historico { width: 360px; margin-top: 30px; }
+        .item { background: #1e1e1e; padding: 15px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 6px solid #333; }
+        .btn-del { background: none; color: #555; border: none; cursor: pointer; font-size: 1.2rem; }
+        #perfil { margin-bottom: 10px; font-size: 0.9rem; color: #888; display: none; }
+    </style>
+</head>
+<body>
+
+    <button id="login-google" class="btn-google">Entrar com Google</button>
+    <div id="perfil">Conectado como: <span id="user-name"></span></div>
+
+    <div class="card-saldo">
+        <small style="color: #888;">Saldo Atual</small>
+        <h1 id="valor-saldo">R$ 0,00</h1>
+    </div>
+
+    <div class="card-input">
+        <input type="text" id="desc" placeholder="Descrição">
+        <input type="text" id="valor" placeholder="R$ 0,00" id="input-valor-mask">
+        <div class="botoes">
+            <button class="btn-recebi" id="btn-recebi">RECEBI</button>
+            <button class="btn-gastei" id="btn-gastei">GASTEI</button>
+        </div>
+    </div>
+
+    <div class="historico">
+        <div id="lista"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAVEXSgz2TX3WnRlzRlUK_Rj8CXe72OZa4",
+            authDomain: "projeto-finance-cedc4.firebaseapp.com",
+            projectId: "projeto-finance-cedc4",
+            storageBucket: "projeto-finance-cedc4.firebasestorage.app",
+            messagingSenderId: "83128434935",
+            appId: "1:83128434935:web:1e9a8fe04906e3d9fc53f2"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const provider = new GoogleAuthProvider();
+
+        let dados = { saldo: 0, lista: [] };
+        let usuarioAtual = null;
+
+        // --- MÁSCARA DE MOEDA ---
+        const inputValor = document.getElementById('valor');
+        inputValor.addEventListener('input', (e) => {
+            let v = e.target.value.replace(/\D/g, '');
+            v = (v / 100).toFixed(2) + '';
+            v = v.replace(".", ",");
+            v = v.replace(/(\d)(\d{3})(\d{3}),/g, "$1.$2.$3,");
+            v = v.replace(/(\d)(\d{3}),/g, "$1.$2,");
+            e.target.value = "R$ " + v;
+        });
+
+        // --- LOGIN ---
+        document.getElementById('login-google').onclick = () => {
+            signInWithPopup(auth, provider).catch(err => alert("Erro ao logar: " + err.message));
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                usuarioAtual = user.uid;
+                document.getElementById('login-google').style.display = 'none';
+                document.getElementById('perfil').style.display = 'block';
+                document.getElementById('user-name').innerText = user.displayName;
+                carregarDados();
+            }
+        });
+
+        // --- BANCO DE DADOS ---
+        async function carregarDados() {
+            const docRef = doc(db, "usuarios", usuarioAtual);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                dados = docSnap.data();
+            }
+            atualizarTela();
+        }
+
+        async function salvar() {
+            if (usuarioAtual) {
+                await setDoc(doc(db, "usuarios", usuarioAtual), dados);
+            }
+            atualizarTela();
+        }
+
+        // --- AÇÕES ---
+        async function adicionar(ehGanho) {
+            const inputDesc = document.getElementById('desc');
+            let valorLimpo = inputValor.value.replace("R$ ", "").replace(/\./g, "").replace(",", ".");
+            const valorNum = parseFloat(valorLimpo);
+
+            if (!inputDesc.value || isNaN(valorNum) || valorNum <= 0) return;
+
+            dados.saldo = ehGanho ? dados.saldo + valorNum : dados.saldo - valorNum;
+            dados.lista.push({ id: Date.now(), texto: inputDesc.value, num: valorNum, tipo: ehGanho });
+
+            inputDesc.value = ""; inputValor.value = "";
+            await salvar();
+        }
+
+        window.apagar = async (id) => {
+            const item = dados.lista.find(i => i.id === id);
+            if (!item) return;
+            dados.saldo = item.tipo ? dados.saldo - item.num : dados.saldo + item.num;
+            dados.lista = dados.lista.filter(i => i.id !== id);
+            await salvar();
+        };
+
+        document.getElementById('btn-recebi').onclick = () => adicionar(true);
+        document.getElementById('btn-gastei').onclick = () => adicionar(false);
+
+        // Enter no campo de descrição pula pro valor
+        document.getElementById('desc').onkeydown = (e) => { if(e.key === 'Enter') inputValor.focus(); };
+        // Enter no campo de valor salva como RECEBI
+        inputValor.onkeydown = (e) => { if(e.key === 'Enter') adicionar(true); };
+
+        function atualizarTela() {
+            const elSaldo = document.getElementById('valor-saldo');
+            const elLista = document.getElementById('lista');
+            elSaldo.innerText = dados.saldo.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'});
+            elSaldo.style.color = dados.saldo > 0 ? "#2ecc71" : (dados.saldo < 0 ? "#e74c3c" : "white");
+            elLista.innerHTML = "";
+            [...dados.lista].reverse().forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'item';
+                div.style.borderLeftColor = item.tipo ? "#2ecc71" : "#e74c3c";
+                div.innerHTML = `<div><b>${item.texto}</b><br><small>${item.num.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})}</small></div><button class="btn-del" onclick="apagar(${item.id})">✕</button>`;
+                elLista.appendChild(div);
+            });
+        }
+    </script>
+</body>
+</html>
