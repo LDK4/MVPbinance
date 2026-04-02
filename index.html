@@ -6,6 +6,11 @@
     <title>MVP Balance - Financeiro</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
+        
+        /* Estilo dos Filtros */
+        .filter-btn { background: #1e1e1e; color: #888; padding: 8px 18px; border-radius: 20px; font-size: 0.85rem; border: 1px solid #333; transition: 0.3s; cursor: pointer; }
+        .filter-btn.active { background: #4285F4; color: white; border-color: #4285F4; box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3); }
+        
         .card-saldo { background: #1e1e1e; padding: 30px; border-radius: 20px; width: 320px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; }
         #valor-saldo { font-size: 3rem; margin: 10px 0; font-weight: bold; }
         .card-input { background: #1e1e1e; padding: 20px; border-radius: 20px; width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; }
@@ -40,6 +45,12 @@
         </div>
     </div>
 
+    <div class="filtros" style="display: flex; gap: 10px; margin: 20px 0; width: 360px; justify-content: center;">
+        <button class="filter-btn active" onclick="filtrar('todos', this)">Tudo</button>
+        <button class="filter-btn" onclick="filtrar('ganho', this)">Ganhos</button>
+        <button class="filter-btn" onclick="filtrar('gasto', this)">Gastos</button>
+    </div>
+
     <div class="historico">
         <div id="lista"></div>
     </div>
@@ -65,6 +76,15 @@
 
         let dados = { saldo: 0, lista: [] };
         let usuarioAtual = null;
+        let filtroAtual = 'todos';
+
+        // --- FILTRO ---
+        window.filtrar = (tipo, el) => {
+            filtroAtual = tipo;
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            el.classList.add('active');
+            atualizarTela();
+        };
 
         // --- MÁSCARA DE MOEDA ---
         const inputValor = document.getElementById('valor');
@@ -135,15 +155,14 @@
 
         document.getElementById('btn-recebi').onclick = () => adicionar(true);
         document.getElementById('btn-gastei').onclick = () => adicionar(false);
-        // Enter no campo de descrição pula para o campo de valor
-document.getElementById('desc').onkeydown = (e) => { 
-    if(e.key === 'Enter') document.getElementById('valor').focus(); 
-};
+        
+        document.getElementById('desc').onkeydown = (e) => { 
+            if(e.key === 'Enter') document.getElementById('valor').focus(); 
+        };
 
-// Enter no campo de valor salva automaticamente como RECEBI
-document.getElementById('valor').onkeydown = (e) => { 
-    if(e.key === 'Enter') adicionar(true); 
-};
+        document.getElementById('valor').onkeydown = (e) => { 
+            if(e.key === 'Enter') adicionar(true); 
+        };
 
         function atualizarTela() {
             const elSaldo = document.getElementById('valor-saldo');
@@ -151,11 +170,25 @@ document.getElementById('valor').onkeydown = (e) => {
             elSaldo.innerText = dados.saldo.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'});
             elSaldo.style.color = dados.saldo > 0 ? "#2ecc71" : (dados.saldo < 0 ? "#e74c3c" : "white");
             elLista.innerHTML = "";
-            [...dados.lista].reverse().forEach(item => {
+
+            const listaFiltrada = dados.lista.filter(item => {
+                if (filtroAtual === 'todos') return true;
+                if (filtroAtual === 'ganho') return item.tipo === true;
+                if (filtroAtual === 'gasto') return item.tipo === false;
+            });
+
+            [...listaFiltrada].reverse().forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'item';
                 div.style.borderLeftColor = item.tipo ? "#2ecc71" : "#e74c3c";
-                div.innerHTML = `<div><b>${item.texto}</b><br><span>${item.num.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})}</span><br><small style="color:#888; font-size:0.7rem">${item.data || ''}</small></div><button class="btn-del" onclick="apagar(${item.id})">✕</button>`;
+                div.innerHTML = `
+                    <div>
+                        <b>${item.texto}</b><br>
+                        <span>${item.num.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})}</span><br>
+                        <small style="color:#888; font-size:0.7rem">${item.data || ''}</small>
+                    </div>
+                    <button class="btn-del" onclick="apagar(${item.id})">✕</button>
+                `;
                 elLista.appendChild(div);
             });
         }
