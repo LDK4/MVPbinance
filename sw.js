@@ -6,7 +6,6 @@ const assets = [
 ];
 
 self.addEventListener('install', (event) => {
-  // Força a nova versão a ser instalada imediatamente
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -16,7 +15,6 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  // Limpa caches antigos para liberar espaço e atualizar o Pix
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
@@ -24,7 +22,6 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
-  // Garante que o Service Worker controle a página imediatamente
   self.clients.claim();
 });
 
