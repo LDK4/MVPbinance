@@ -11,7 +11,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MVP Balance - Financeiro</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #000; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; min-height: 100vh; position: relative; padding-bottom: 80px; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #000; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; min-height: 100vh; box-sizing: border-box; }
         
         .card-saldo { background: #111; padding: 30px; border-radius: 25px; width: 320px; margin-bottom: 20px; border: 1px solid #222; text-align: center; }
         #valor-saldo { font-size: 3rem; margin: 10px 0; font-weight: bold; }
@@ -40,10 +40,33 @@
         .btn-google { background: #fff; color: #000; width: 320px; margin-bottom: 20px; border-radius: 15px; padding: 15px; font-weight: bold; cursor: pointer; border: none; }
         #perfil { margin-bottom: 15px; font-size: 0.8rem; color: #888; display: none; }
 
-        /* ESTILO DO PIX DISCRETO */
-        .footer-pix { margin-top: 40px; padding: 20px; text-align: center; font-size: 0.75rem; color: #444; cursor: pointer; transition: 0.3s; }
-        .footer-pix:hover { color: #f3ba2f; }
-        #pix-copy-status { display: block; font-size: 0.65rem; margin-top: 5px; color: #02c076; opacity: 0; transition: 0.3s; }
+        /* --- ESTILO DO PIX DISCRETO --- */
+        .footer-pix { 
+            margin-top: 50px; 
+            padding: 20px; 
+            text-align: center; 
+            font-size: 0.8rem; 
+            color: #666; 
+            cursor: pointer; 
+            transition: 0.3s;
+            border-radius: 15px;
+            border: 1px solid transparent;
+        }
+        .footer-pix:hover { 
+            color: #f3ba2f; 
+            background: #111; 
+            border-color: #222;
+        }
+        .footer-pix b { color: #aaa; }
+        #pix-copy-status { 
+            display: block; 
+            font-size: 0.7rem; 
+            margin-top: 8px; 
+            color: #02c076; 
+            opacity: 0; 
+            transition: 0.3s; 
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -81,9 +104,10 @@
         <div id="lista"></div>
     </div>
 
-    <div class="footer-pix" onclick="copiarPix()">
-        Apoie este projeto: <span id="chave-pix">desouzanunes10o@gmail.com</span>
-        <span id="pix-copy-status">✓ Chave copiada!</span>
+    <div class="footer-pix" id="btn-pix">
+        Apoie o desenvolvedor: <br>
+        <b>Chave Pix (E-mail):</b> <span id="chave-pix">desouzanunes10o@gmail.com</span>
+        <span id="pix-copy-status">✓ Chave copiada! Abra o app do seu banco.</span>
     </div>
 
     <script type="module">
@@ -106,11 +130,7 @@
         const provider = new GoogleAuthProvider();
 
         enableIndexedDbPersistence(db).catch((err) => {
-            if (err.code == 'failed-precondition') {
-                console.log('Persistência falhou: multiplas abas abertas.');
-            } else if (err.code == 'unimplemented') {
-                console.log('Navegador não suporta persistência.');
-            }
+            console.log("Erro persistência:", err.code);
         });
 
         let dados = { saldo: 0, lista: [] };
@@ -118,13 +138,13 @@
         let filtroTipo = 'todos';
         let dataVisualizacao = new Date();
 
-        // Função Global para o Pix
-        window.copiarPix = () => {
+        // Lógica para Copiar Pix
+        document.getElementById('btn-pix').onclick = () => {
             const chave = document.getElementById('chave-pix').innerText;
             navigator.clipboard.writeText(chave).then(() => {
                 const status = document.getElementById('pix-copy-status');
                 status.style.opacity = '1';
-                setTimeout(() => status.style.opacity = '0', 2000);
+                setTimeout(() => status.style.opacity = '0', 3000);
             });
         };
 
