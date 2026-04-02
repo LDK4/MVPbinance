@@ -3,21 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MVP Balance - Google Cloud</title>
+    <title>MVP Balance - Financeiro</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
         .card-saldo { background: #1e1e1e; padding: 30px; border-radius: 20px; width: 320px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; }
         #valor-saldo { font-size: 3rem; margin: 10px 0; font-weight: bold; }
-        
         .card-input { background: #1e1e1e; padding: 20px; border-radius: 20px; width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; }
         input { background: #2a2a2a; border: 1px solid #333; color: white; padding: 15px; margin: 8px 0; width: 88%; border-radius: 12px; font-size: 1.1rem; outline: none; }
-        
         .botoes { display: flex; gap: 10px; margin-top: 15px; }
         button { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; font-size: 1rem; cursor: pointer; transition: 0.2s; }
         .btn-recebi { background: #2ecc71; color: white; }
         .btn-gastei { background: #e74c3c; color: white; }
         .btn-google { background: #4285F4; color: white; width: 320px; margin-bottom: 20px; border-radius: 12px; border: none; padding: 15px; font-weight: bold; cursor: pointer; }
-
         .historico { width: 360px; margin-top: 30px; }
         .item { background: #1e1e1e; padding: 15px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 6px solid #333; }
         .btn-del { background: none; color: #555; border: none; cursor: pointer; font-size: 1.2rem; }
@@ -36,7 +33,7 @@
 
     <div class="card-input">
         <input type="text" id="desc" placeholder="Descrição">
-        <input type="text" id="valor" placeholder="R$ 0,00" id="input-valor-mask">
+        <input type="text" id="valor" placeholder="R$ 0,00">
         <div class="botoes">
             <button class="btn-recebi" id="btn-recebi">RECEBI</button>
             <button class="btn-gastei" id="btn-gastei">GASTEI</button>
@@ -71,18 +68,20 @@
 
         // --- MÁSCARA DE MOEDA ---
         const inputValor = document.getElementById('valor');
-        inputValor.addEventListener('input', (e) => {
-            let v = e.target.value.replace(/\D/g, '');
-            v = (v / 100).toFixed(2) + '';
-            v = v.replace(".", ",");
-            v = v.replace(/(\d)(\d{3})(\d{3}),/g, "$1.$2.$3,");
-            v = v.replace(/(\d)(\d{3}),/g, "$1.$2,");
-            e.target.value = "R$ " + v;
-        });
+        if(inputValor) {
+            inputValor.addEventListener('input', (e) => {
+                let v = e.target.value.replace(/\D/g, '');
+                v = (v / 100).toFixed(2) + '';
+                v = v.replace(".", ",");
+                v = v.replace(/(\d)(\d{3})(\d{3}),/g, "$1.$2.$3,");
+                v = v.replace(/(\d)(\d{3}),/g, "$1.$2,");
+                e.target.value = "R$ " + v;
+            });
+        }
 
         // --- LOGIN ---
         document.getElementById('login-google').onclick = () => {
-            signInWithPopup(auth, provider).catch(err => alert("Erro ao logar: " + err.message));
+            signInWithPopup(auth, provider).catch(err => alert("Erro: " + err.message));
         };
 
         onAuthStateChanged(auth, (user) => {
@@ -95,35 +94,34 @@
             }
         });
 
-        // --- BANCO DE DADOS ---
         async function carregarDados() {
+            if(!usuarioAtual) return;
             const docRef = doc(db, "usuarios", usuarioAtual);
             const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                dados = docSnap.data();
-            }
+            if (docSnap.exists()) { dados = docSnap.data(); }
             atualizarTela();
         }
 
         async function salvar() {
-            if (usuarioAtual) {
-                await setDoc(doc(db, "usuarios", usuarioAtual), dados);
-            }
+            if (usuarioAtual) { await setDoc(doc(db, "usuarios", usuarioAtual), dados); }
             atualizarTela();
         }
 
-        // --- AÇÕES ---
         async function adicionar(ehGanho) {
             const inputDesc = document.getElementById('desc');
-            let valorLimpo = inputValor.value.replace("R$ ", "").replace(/\./g, "").replace(",", ".");
+            const inputVal = document.getElementById('valor');
+            let valorLimpo = inputVal.value.replace("R$ ", "").replace(/\./g, "").replace(",", ".");
             const valorNum = parseFloat(valorLimpo);
 
             if (!inputDesc.value || isNaN(valorNum) || valorNum <= 0) return;
 
-            dados.saldo = ehGanho ? dados.saldo + valorNum : dados.saldo - valorNum;
-            dados.lista.push({ id: Date.now(), texto: inputDesc.value, num: valorNum, tipo: ehGanho });
+            const agora = new Date();
+            const dataFormatada = agora.toLocaleDateString('pt-br') + " às " + agora.toLocaleTimeString('pt-br', {hour: '2-digit', minute:'2-digit'});
 
-            inputDesc.value = ""; inputValor.value = "";
+            dados.saldo = ehGanho ? dados.saldo + valorNum : dados.saldo - valorNum;
+            dados.lista.push({ id: Date.now(), texto: inputDesc.value, num: valorNum, tipo: ehGanho, data: dataFormatada });
+
+            inputDesc.value = ""; inputVal.value = "";
             await salvar();
         }
 
@@ -137,11 +135,15 @@
 
         document.getElementById('btn-recebi').onclick = () => adicionar(true);
         document.getElementById('btn-gastei').onclick = () => adicionar(false);
+        // Enter no campo de descrição pula para o campo de valor
+document.getElementById('desc').onkeydown = (e) => { 
+    if(e.key === 'Enter') document.getElementById('valor').focus(); 
+};
 
-        // Enter no campo de descrição pula pro valor
-        document.getElementById('desc').onkeydown = (e) => { if(e.key === 'Enter') inputValor.focus(); };
-        // Enter no campo de valor salva como RECEBI
-        inputValor.onkeydown = (e) => { if(e.key === 'Enter') adicionar(true); };
+// Enter no campo de valor salva automaticamente como RECEBI
+document.getElementById('valor').onkeydown = (e) => { 
+    if(e.key === 'Enter') adicionar(true); 
+};
 
         function atualizarTela() {
             const elSaldo = document.getElementById('valor-saldo');
@@ -153,7 +155,7 @@
                 const div = document.createElement('div');
                 div.className = 'item';
                 div.style.borderLeftColor = item.tipo ? "#2ecc71" : "#e74c3c";
-                div.innerHTML = `<div><b>${item.texto}</b><br><small>${item.num.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})}</small></div><button class="btn-del" onclick="apagar(${item.id})">✕</button>`;
+                div.innerHTML = `<div><b>${item.texto}</b><br><span>${item.num.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})}</span><br><small style="color:#888; font-size:0.7rem">${item.data || ''}</small></div><button class="btn-del" onclick="apagar(${item.id})">✕</button>`;
                 elLista.appendChild(div);
             });
         }
